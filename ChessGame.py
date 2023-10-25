@@ -5,12 +5,12 @@ import sys
 pygame.init()
 
 # Constants
-WIDTH, HEIGHT = 400, 400
+WIDTH, HEIGHT = 600, 600
 GRID_SIZE = WIDTH // 8
 
 # Colors
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
+BROWN= (150, 105, 25)
 
 # Create a window
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -59,7 +59,7 @@ while running:
             if (row + col) % 2 == 0:
                 color = WHITE
             else:
-                color = BLACK
+                color = BROWN
             pygame.draw.rect(screen, color, (col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE))
 
     # Draw the chess pieces on the board
