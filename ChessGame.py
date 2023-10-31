@@ -10,7 +10,7 @@ GRID_SIZE = WIDTH // 8
 
 # Colors
 WHITE = (255, 255, 255)
-BROWN= (150, 105, 25)
+BROWN = (150, 105, 25)
 
 # Create a window
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -32,6 +32,7 @@ images = {
     "k": pygame.image.load("wK.png"),
 }
 
+
 # Chessboard state
 board = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
@@ -44,12 +45,40 @@ board = [
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ]
 
+# Variables to store dragged piece information
+dragging = False
+dragged_piece = None
+start_pos = None
+
 # Main game loop
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN and not dragging:
+            x, y = pygame.mouse.get_pos()
+            col = x // GRID_SIZE
+            row = y // GRID_SIZE
+            if 0 <= row < 8 and 0 <= col < 8:
+                piece = board[7 - row][col]
+                if piece:
+                    dragging = True
+                    dragged_piece = piece
+                    start_pos = (row, col)
+                    board[7 - row][col] = ""  # Remove the piece from its original position
+        elif event.type == pygame.MOUSEBUTTONUP and dragging:
+            x, y = pygame.mouse.get_pos()
+            col = x // GRID_SIZE
+            row = y // GRID_SIZE
+            if 0 <= row < 8 and 0 <= col < 8 and board[7 - row][col] == "":
+                board[7 - row][col] = dragged_piece  # Move the piece to the new position
+            else:
+                # Move the piece back to its original position if the move is invalid
+                board[start_pos[0]][start_pos[1]] = dragged_piece
+            dragging = False
+            dragged_piece = None
+            start_pos = None
 
     screen.fill(WHITE)
 
