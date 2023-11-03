@@ -1,6 +1,13 @@
 import pygame
 import sys
 
+#-----------------------------------------------------------
+#CHECKLIST
+#- Make player moves in turns (white first or black first etc...)
+#- Display green box for valid moves
+#- Create a check move
+#- Add en passent and castlings
+#------------------------------------------------------------
 # Initialize Pygame
 pygame.init()
 
@@ -11,6 +18,7 @@ GRID_SIZE = WIDTH // 8
 # Colors
 WHITE = (255, 255, 255)
 BROWN = (150, 105, 25)
+GREEN = (0, 255, 0)
 
 # Create a window
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -18,18 +26,18 @@ pygame.display.set_caption("Chess Game")
 
 # Load chess piece images
 images = {
-    "P": pygame.image.load("bP.png"),
-    "R": pygame.image.load("bR.png"),
-    "N": pygame.image.load("bK.png"),
-    "B": pygame.image.load("bB.png"),
-    "Q": pygame.image.load("bQ.png"),
-    "K": pygame.image.load("bK.png"),
-    "p": pygame.image.load("wp.png"),
-    "r": pygame.image.load("wR.png"),
-    "n": pygame.image.load("wK.png"),
-    "b": pygame.image.load("wB.png"),
-    "q": pygame.image.load("wQ.png"),
-    "k": pygame.image.load("wK.png"),
+    "P": pygame.image.load("wp.png"),
+    "R": pygame.image.load("wR.png"),
+    "N": pygame.image.load("wN.png"),
+    "B": pygame.image.load("wB.png"),
+    "Q": pygame.image.load("wQ.png"),
+    "K": pygame.image.load("wK.png"),
+    "p": pygame.image.load("bp.png"),
+    "r": pygame.image.load("br.png"),
+    "n": pygame.image.load("bn.png"),
+    "b": pygame.image.load("bb.png"),
+    "q": pygame.image.load("bq.png"),
+    "k": pygame.image.load("bk.png"),
 }
 
 # Chessboard state
@@ -44,154 +52,185 @@ board = [
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ]
 
-# Variables to store dragged piece information
-dragging = False
-dragged_piece = None
-start_pos = None
+# Function to convert pixel coordinates to chessboard coordinates
+def pixel_to_chessboard(pos):
+    x, y = pos
+    col = x // GRID_SIZE
+    row = 7 - y // GRID_SIZE
+    return row, col
 
-valid_move_squares = []
 
-# Function to initialize the game
-def initialize_game():
-    global screen
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Chess Game")
+# Legal move function for pawns
+def is_valid_pawn_move(start, end, board):
+    row_start, col_start = start
+    row_end, col_end = end
+    piece = board[row_start][col_start]
 
-# Function to get valid moves for a pawn
-def get_valid_pawn_moves(row, col):
-    valid_moves = []
-    piece = board[row][col]
-    direction = 1 if piece.isupper() else -1  # Determine the direction for the pawn based on its color
+    # Determine the direction of movement (up or down based on the piece)
+    if piece.islower():
+        direction = 1  # Black pawn moves down
+    else:
+        direction = -1  # White pawn moves up
 
-    # Move one square forward
-    if board[row + direction][col] == "":
-        valid_moves.append((row + direction, col))
+    # Check if the target square is one square forward and empty
+    if col_start == col_end and row_end == row_start + direction and board[row_end][col_end] == "":
+        return True
 
-    # Move two squares forward (for the initial move)
+    # Check if the target square is one square diagonally forward and has an opponent's piece
+    if abs(col_end - col_start) == 1 and row_end == row_start + direction and board[row_end][col_end].islower() != piece.islower():
+        return True
+
+    # Handle the initial two-square move for pawns
     if (
-        ((direction == 1 and row == 1) or (direction == -1 and row == 6))
-        and board[row + direction][col] == ""
-        and board[row + 2 * direction][col] == ""
-    ):
-        valid_moves.append((row + 2 * direction, col))
+        (row_start == 1 and piece.islower()) or (row_start == 6 and piece.isupper())
+    ) and col_start == col_end and row_end == row_start + 2 * direction and board[row_start + direction][col_start] == "":
+        return True
 
-    # Capture diagonally
-    for delta_col in [-1, 1]:
-        target_row = row + direction
-        target_col = col + delta_col
-        if 0 <= target_row < 8 and 0 <= target_col < 8 and board[target_row][target_col] != "":
-            valid_moves.append((target_row, target_col))
+    return False
 
-    return valid_moves
+# Legal move function for rooks
+def is_valid_rook_move(start, end, board):
+    row_start, col_start = start
+    row_end, col_end = end
 
-# Function to get valid moves for a rook
-def get_valid_rook_moves(row, col):
-    valid_moves = []
-    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+    # Rook can move either horizontally or vertically
+    if row_start == row_end:
+        # Moving horizontally
+        step = 1 if col_end > col_start else -1
+        for col in range(col_start + step, col_end, step):
+            if board[row_start][col] != "":
+                return False
+        return True
+    elif col_start == col_end:
+        # Moving vertically
+        step = 1 if row_end > row_start else -1
+        for row in range(row_start + step, row_end, step):
+            if board[row][col_start] != "":
+                return False
+        return True
 
-    for dr, dc in directions:
-        r, c = row + dr, col + dc
-        while 0 <= r < 8 and 0 <= c < 8:
-            if board[r][c] == "":
-                valid_moves.append((r, c))
-                r, c = r + dr, c + dc
-            else:
-                if board[r][c].islower() != board[row][col].islower():
-                    valid_moves.append((r, c))
-                break
+    return False
 
-    return valid_moves
+# Legal move function for knights
+def is_valid_knight_move(start, end, board):
+    row_start, col_start = start
+    row_end, col_end = end
 
-# Function to get valid moves for a knight
-def get_valid_knight_moves(row, col):
-    valid_moves = []
-    knight_moves = [(2, 1), (1, 2), (-2, 1), (-1, 2), (2, -1), (1, -2), (-2, -1), (-1, -2)]
+    # Knights can move in diagnolly
+    if (abs(row_end - row_start) == 2 and abs(col_end - col_start) == 1) or (abs(row_end - row_start) == 1 and abs(col_end - col_start) == 2):
+        return True
 
-    for dr, dc in knight_moves:
-        r, c = row + dr, col + dc
-        if 0 <= r < 8 and 0 <= c < 8:
-            if board[r][c] == "" or board[r][c].islower() != board[row][col].islower():
-                valid_moves.append((r, c))
-
-    return valid_moves
-
-# Function to get valid moves for a bishop
-def get_valid_bishop_moves(row, col):
-    valid_moves = []
-    directions = [(1, 1), (1, -1), (-1, 1), (-1, -1)]
-
-    for dr, dc in directions:
-        r, c = row + dr, col + dc
-        while 0 <= r < 8 and 0 <= c < 8:
-            if board[r][c] == "":
-                valid_moves.append((r, c))
-                r, c = r + dr, c + dc
-            else:
-                if board[r][c].islower() != board[row][col].islower():
-                    valid_moves.append((r, c))
-                break
-
-    return valid_moves
-
-# Function to get valid moves for a queen
-def get_valid_queen_moves(row, col):
-    rook_moves = get_valid_rook_moves(row, col)
-    bishop_moves = get_valid_bishop_moves(row, col)
-    return rook_moves + bishop_moves
-
-# Function to get valid moves for a king
-def get_valid_king_moves(row, col):
-    valid_moves = []
-    directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
-
-    for dr, dc in directions:
-        r, c = row + dr, col + dc
-        if 0 <= r < 8 and 0 <= c < 8:
-            if board[r][c] == "" or board[r][c].islower() != board[row][col].islower():
-                valid_moves.append((r, c))
-
-    return valid_moves
-
-# Function to calculate valid moves for a piece
-def calculate_valid_moves(row, col, piece):
-    if piece.lower() == 'p':
-        return get_valid_pawn_moves(row, col)
-    elif piece.lower() == 'r':
-        return get_valid_rook
+    return False
 
 
+# Legal move function for bishops
+def is_valid_bishop_move(start, end, board):
+    row_start, col_start = start
+    row_end, col_end = end
+
+    # Bishop can move diagonally
+    if abs(row_end - row_start) == abs(col_end - col_start):
+        step_row = 1 if row_end > row_start else -1
+        step_col = 1 if col_end > col_start else -1
+        row, col = row_start + step_row, col_start + step_col
+        while row != row_end:
+            if board[row][col] != "":
+                return False
+            row += step_row
+            col += step_col
+        return True
+
+    return False
+
+# Legal move function for queens
+def is_valid_queen_move(start, end, board):
+    row_start, col_start = start
+    row_end, col_end = end
+
+    # Queen can move horizontally, vertically, or diagonally
+    if row_start == row_end or col_start == col_end or abs(row_end - row_start) == abs(col_end - col_start):
+        if row_start == row_end:
+            step_col = 1 if col_end > col_start else -1
+            col = col_start + step_col
+            while col != col_end:
+                if board[row_start][col] != "":
+                    return False
+                col += step_col
+        elif col_start == col_end:
+            step_row = 1 if row_end > row_start else -1
+            row = row_start + step_row
+            while row != row_end:
+                if board[row][col_start] != "":
+                    return False
+                row += step_row
+        else:
+            step_row = 1 if row_end > row_start else -1
+            step_col = 1 if col_end > col_start else -1
+            row, col = row_start + step_row, col_start + step_col
+            while row != row_end:
+                if board[row][col] != "":
+                    return False
+                row += step_row
+                col += step_col
+        return True
+
+    return False
+
+# Legal move function for kings
+def is_valid_king_move(start, end, board):
+    row_start, col_start = start
+    row_end, col_end = end
+
+    # King can move one square in any direction
+    if abs(row_end - row_start) <= 1 and abs(col_end - col_start) <= 1:
+        return True
+
+    return False
 
 # Main game loop
 running = True
+selected_piece = None
+selected_piece_position = None
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN and not dragging:
+        elif event.type == pygame.MOUSEBUTTONDOWN:
             x, y = pygame.mouse.get_pos()
-            col = x // GRID_SIZE
-            row = y // GRID_SIZE
-            if 0 <= row < 8 and 0 <= col < 8:
-                piece = board[7 - row][col]
-                if piece:
-                    dragging = True
-                    dragged_piece = piece
-                    start_pos = (row, col)
-                    board[7 - row][col] = ""  # Remove the piece from its original position
-                    valid_move_squares = calculate_valid_moves(7 - row, col, piece)
-        elif event.type == pygame.MOUSEBUTTONUP and dragging:
-            x, y = pygame.mouse.get_pos()
-            col = x // GRID_SIZE
-            row = y // GRID_SIZE
-            if 0 <= row < 8 and 0 <= col < 8 and board[7 - row][col] == "":
-                board[7 - row][col] = dragged_piece  # Move the piece to the new position
-            else:
-                # Move the piece back to its original position if the move is invalid
-                board[start_pos[0]][start_pos[1]] = dragged_piece
-            dragging = False
-            dragged_piece = None
-            start_pos = None
+            position = pixel_to_chessboard((x, y))
 
+            if not selected_piece:
+                piece = board[position[0]][position[1]]
+                if piece:
+                    selected_piece = piece
+                    selected_piece_position = position
+            else:
+                target_position = position
+
+                if target_position != selected_piece_position:
+                    # Check if the move is valid for the selected piece
+                    if selected_piece.lower() == "p":
+                        valid_move = is_valid_pawn_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "r":
+                        valid_move = is_valid_rook_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "n":
+                        valid_move = is_valid_knight_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "b":
+                        valid_move = is_valid_bishop_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "q":
+                        valid_move = is_valid_queen_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "k":
+                        valid_move = is_valid_king_move(selected_piece_position, target_position, board)
+                    else:
+                        valid_move = False  # Add validation for other piece types
+
+                    if valid_move:
+                        board[selected_piece_position[0]][selected_piece_position[1]] = ""
+                        board[target_position[0]][target_position[1]] = selected_piece
+
+                selected_piece = None
+                selected_piece_position = None
     screen.fill(WHITE)
 
     # Draw the chessboard
@@ -203,13 +242,7 @@ while running:
                 color = BROWN
             pygame.draw.rect(screen, color, (col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE))
 
-     # Draw the translucent overlay on valid move squares
-    for move_square in valid_move_squares:
-        row, col = move_square
-        overlay_color = (0, 255, 0, 100)  # Green with 100 alpha for transparency
-        pygame.draw.rect(screen, overlay_color, (col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE))
-
-    # Draw the chess pieces on the board
+# Draw the chess pieces on the board
     for row in range(8):
         for col in range(8):
             piece = board[7 - row][col]
@@ -218,8 +251,8 @@ while running:
                 piece_rect = piece_image.get_rect(center=(col * GRID_SIZE + GRID_SIZE // 2, row * GRID_SIZE + GRID_SIZE // 2))
                 screen.blit(piece_image, piece_rect.topleft)
 
+
     pygame.display.flip()
 
 pygame.quit()
 sys.exit()
-
