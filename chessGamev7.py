@@ -9,6 +9,8 @@ import sys
 #- Display green box for valid moves
 #- Create a check move
 #- Add en passent and castlings
+# - Split functions into seperate files and import it 
+# - Add test functions 
 #------------------------------------------------------------
 # Initialize Pygame
 pygame.init()
