@@ -3,16 +3,11 @@ import sys
 
 #-----------------------------------------------------------
 #CHECKLIST
-
-#- Add bishops, queen, kings
 #- Make player moves in turns (white first or black first etc...)
 #- Display green box for valid moves
 #- Create a check move
-#- Add en passant and castlings
-# - Split functions into separate files and import it 
-# - Add test functions 
+#- Add en passent and castlings
 #------------------------------------------------------------
-
 # Initialize Pygame
 pygame.init()
 
@@ -63,6 +58,7 @@ def pixel_to_chessboard(pos):
     col = x // GRID_SIZE
     row = 7 - y // GRID_SIZE
     return row, col
+
 
 # Legal move function for pawns
 def is_valid_pawn_move(start, end, board):
@@ -115,54 +111,81 @@ def is_valid_rook_move(start, end, board):
 
     return False
 
+# Legal move function for knights
+def is_valid_knight_move(start, end, board):
+    row_start, col_start = start
+    row_end, col_end = end
+
+    # Knights can move in diagnolly
+    if (abs(row_end - row_start) == 2 and abs(col_end - col_start) == 1) or (abs(row_end - row_start) == 1 and abs(col_end - col_start) == 2):
+        return True
+
+    return False
+
+
 # Legal move function for bishops
 def is_valid_bishop_move(start, end, board):
     row_start, col_start = start
     row_end, col_end = end
 
-    # Check if the move is along a diagonal (|delta_row| == |delta_col|)
-    delta_row = abs(row_end - row_start)
-    delta_col = abs(col_end - col_start)
-    if delta_row != delta_col:
-        return False
+    # Bishop can move diagonally
+    if abs(row_end - row_start) == abs(col_end - col_start):
+        step_row = 1 if row_end > row_start else -1
+        step_col = 1 if col_end > col_start else -1
+        row, col = row_start + step_row, col_start + step_col
+        while row != row_end:
+            if board[row][col] != "":
+                return False
+            row += step_row
+            col += step_col
+        return True
 
-    # Check for any obstructions in the diagonal path
-    step_row = 1 if row_end > row_start else -1
-    step_col = 1 if col_end > col_start else -1
-
-    for i in range(1, delta_row):
-        row = row_start + i * step_row
-        col = col_start + i * step_col
-        if board[row][col] != "":
-            return False
-
-    return True
+    return False
 
 # Legal move function for queens
 def is_valid_queen_move(start, end, board):
-    return is_valid_rook_move(start, end, board) or is_valid_bishop_move(start, end, board)
+    row_start, col_start = start
+    row_end, col_end = end
+
+    # Queen can move horizontally, vertically, or diagonally
+    if row_start == row_end or col_start == col_end or abs(row_end - row_start) == abs(col_end - col_start):
+        if row_start == row_end:
+            step_col = 1 if col_end > col_start else -1
+            col = col_start + step_col
+            while col != col_end:
+                if board[row_start][col] != "":
+                    return False
+                col += step_col
+        elif col_start == col_end:
+            step_row = 1 if row_end > row_start else -1
+            row = row_start + step_row
+            while row != row_end:
+                if board[row][col_start] != "":
+                    return False
+                row += step_row
+        else:
+            step_row = 1 if row_end > row_start else -1
+            step_col = 1 if col_end > col_start else -1
+            row, col = row_start + step_row, col_start + step_col
+            while row != row_end:
+                if board[row][col] != "":
+                    return False
+                row += step_row
+                col += step_col
+        return True
+
+    return False
 
 # Legal move function for kings
 def is_valid_king_move(start, end, board):
     row_start, col_start = start
     row_end, col_end = end
 
-    # Check if the move is one square in any direction
-    delta_row = abs(row_end - row_start)
-    delta_col = abs(col_end - col_start)
+    # King can move one square in any direction
+    if abs(row_end - row_start) <= 1 and abs(col_end - col_start) <= 1:
+        return True
 
-    return delta_row <= 1 and delta_col <= 1
-
-# Legal move function for knights
-def is_valid_knight_move(start, end, board):
-    row_start, col_start = start
-    row_end, col_end = end
-
-    # Knights can move in an L-shape: 2 squares in one direction and 1 square in the other direction
-    delta_row = abs(row_end - row_start)
-    delta_col = abs(col_end - col_start)
-
-    return (delta_row == 2 and delta_col == 1) or (delta_row == 1 and delta_col == 2)
+    return False
 
 # Main game loop
 running = True
@@ -186,6 +209,7 @@ while running:
                 target_position = position
 
                 if target_position != selected_piece_position:
+                    # Check if the move is valid for the selected piece
                     if selected_piece.lower() == "p":
                         valid_move = is_valid_pawn_move(selected_piece_position, target_position, board)
                     elif selected_piece.lower() == "r":
@@ -199,7 +223,7 @@ while running:
                     elif selected_piece.lower() == "k":
                         valid_move = is_valid_king_move(selected_piece_position, target_position, board)
                     else:
-                        valid_move = False
+                        valid_move = False  # Add validation for other piece types
 
                     if valid_move:
                         board[selected_piece_position[0]][selected_piece_position[1]] = ""
@@ -207,7 +231,6 @@ while running:
 
                 selected_piece = None
                 selected_piece_position = None
-
     screen.fill(WHITE)
 
     # Draw the chessboard
@@ -219,13 +242,15 @@ while running:
                 color = BROWN
             pygame.draw.rect(screen, color, (col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE))
 
-    # Draw the chess pieces on the board
+# Draw the chess pieces on the board
     for row in range(8):
         for col in range(8):
-            piece = board[row][col]
+            piece = board[7 - row][col]
             if piece:
                 piece_image = images[piece]
-                screen.blit(piece_image, (col * GRID_SIZE, (7 - row) * GRID_SIZE))
+                piece_rect = piece_image.get_rect(center=(col * GRID_SIZE + GRID_SIZE // 2, row * GRID_SIZE + GRID_SIZE // 2))
+                screen.blit(piece_image, piece_rect.topleft)
+
 
     pygame.display.flip()
 
