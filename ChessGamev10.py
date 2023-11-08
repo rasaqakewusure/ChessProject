@@ -2,11 +2,20 @@ import pygame
 import sys
 
 #-----------------------------------------------------------
-#CHECKLIST
-#- Make player moves in turns (white first or black first etc...)
-#- Display green box for valid moves
-#- Create a check move
-#- Add en passent and castlings
+#CHECKLIST: 
+#: By November 15 
+#-Fix black pieces taking its own and white pieces taking its own (pawn works, fix the rest)
+# Castling 
+#Check Move
+
+#: By November 22 
+# En Passant and Promotion 
+
+#: By December 1st 
+
+#: By December 8 
+# Agent 
+# Minimax Algorithm to the chess game (add an evaluation function)
 #------------------------------------------------------------
 # Initialize Pygame
 pygame.init()
@@ -77,7 +86,7 @@ def is_valid_pawn_move(start, end, board):
         return True
 
     # Check if the target square is one square diagonally forward and has an opponent's piece
-    if abs(col_end - col_start) == 1 and row_end == row_start + direction and board[row_end][col_end].islower() != piece.islower():
+    if abs(col_end - col_start) == 1 and row_end == row_start + direction and board[row_end][col_end].islower() != board[row_start][col_start].islower():
         return True
 
     # Handle the initial two-square move for pawns
@@ -223,6 +232,14 @@ while running:
                         valid_move = is_valid_pawn_move(selected_piece_position, target_position, board)
                     elif selected_piece.lower() == "r":
                         valid_move = is_valid_rook_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "n":
+                        valid_move = is_valid_knight_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "b":
+                        valid_move = is_valid_bishop_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "q":
+                        valid_move = is_valid_queen_move(selected_piece_position, target_position, board)
+                    elif selected_piece.lower() == "k":
+                        valid_move = is_valid_king_move(selected_piece_position, target_position, board)
                     else:
                         valid_move = False  # Add validation for other piece types
 
@@ -258,7 +275,6 @@ while running:
 
 pygame.quit()
 sys.exit()
-
 
 
 
