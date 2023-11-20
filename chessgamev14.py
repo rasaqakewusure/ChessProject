@@ -80,16 +80,43 @@ def is_valid_pawn_move(start, board):
 def pawn_promotion():
     promotion_pieces = ["Q", "R", "N", "B"]  # Queen, Rook, Knight, Bishop
 
-    print("Pawn promotion! Choose a piece:")
-    for i, piece in enumerate(promotion_pieces, start=1):
-        print(f"{i}. {piece}")
+    # Pygame initialization for the promotion menu
+    pygame.init()
+    promotion_screen = pygame.display.set_mode((200, 150))
+    pygame.display.set_caption("Pawn Promotion")
 
-    choice = int(input("Enter the number of your choice: "))
-    while choice not in range(1, len(promotion_pieces) + 1):
-        print("Invalid choice. Please choose again.")
-        choice = int(input("Enter the number of your choice: "))
+    font = pygame.font.Font(None, 36)
 
-    board[target_position[0]][target_position[1]] = promotion_pieces[choice - 1]
+    while True:
+        promotion_screen.fill(WHITE)
+
+        text = font.render("Choose a piece:", True, (0, 0, 0))
+        promotion_screen.blit(text, (10, 10))
+
+        for i, piece in enumerate(promotion_pieces):
+            text = font.render(piece, True, (0, 0, 0))
+            promotion_screen.blit(text, (10, 50 + i * 30))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                selected_piece = None
+
+                for i, _ in enumerate(promotion_pieces):
+                    if 10 <= x <= 100 and 50 + i * 30 <= y <= 80 + i * 30:
+                        selected_piece = promotion_pieces[i]
+                        break
+
+                if selected_piece is not None:
+                    board[target_position[0]][target_position[1]] = selected_piece
+                    pygame.quit()
+                    return
+  
 
 # Legal move function for rooks
 def is_valid_rook_move(start, board):
