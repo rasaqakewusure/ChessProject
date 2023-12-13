@@ -46,7 +46,15 @@ board = [
     ["P", "P", "P", "P", "P", "P", "P", "P"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ]
+white_check = False
+black_check = False
+white_checkmate = False
+black_checkmate = False
 
+# Initialize a font and surface for displaying messages
+font = pygame.font.Font(None, 36)
+message_surface = pygame.Surface((WIDTH, 50))
+message_surface.set_alpha(128)  # Set transparency to blend with the board
 # Function to convert pixel coordinates to chessboard coordinates
 def pixel_to_chessboard(pos):
     x, y = pos
@@ -293,7 +301,7 @@ def is_white_turn():
     black_count = sum(row.count(piece) for row in board for piece in black_pieces)
     return white_count == black_count
 
-# Function to check if a king is in check
+# Function to find the position of a king
 def is_king_in_check(color, board):
     king_position = find_king(color, board)
     opponent_color = "black" if color == "white" else "white"
@@ -308,6 +316,7 @@ def is_king_in_check(color, board):
                     return True
 
     return False
+
 
 # Function to find the position of the king on the board
 def find_king(color, board):
@@ -338,6 +347,29 @@ def is_checkmate(color, board):
                         return False
 
     return True
+def king_position(color, board):
+    for row in range(len(board)):
+        for col in range(len(board[row])):
+            if board[row][col] == f"{color.lower()}k":
+                return row, col  # Return the position of the king
+    return None  # Return None if the king is not found
+
+def is_king_in_danger(color, board):
+    king_position = find_king(color, board)
+    opponent_color = "black" if color == "white" else "white"
+
+    # Check if any opponent's piece can attack the king
+    for row in range(8):
+        for col in range(8):
+            piece = board[row][col]
+            if piece and piece.islower() == (color == "white"):  # Check if it's an opponent's piece
+                valid_moves = get_valid_moves((row, col), board)
+                if king_position in valid_moves:
+                    return True
+
+    return False
+
+
 
     # Function to get valid moves for a piece
 def get_valid_moves(start, board):
@@ -354,8 +386,7 @@ def get_valid_moves(start, board):
         return is_valid_queen_move(start, board)
     elif piece.lower() == "k":
         return is_valid_king_move(start, board)
-    # Add validation for other piece types
-
+ 
 def is_valid_castling(king_position, target_position, board):
     # Ensure the king and rook haven't moved
     row, col = king_position
@@ -467,6 +498,7 @@ selected_piece_position = None
 current_turn = "white"  # Initialize the current turn
 
 while running:
+    # Event handling
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -474,6 +506,7 @@ while running:
             x, y = pygame.mouse.get_pos()
             position = pixel_to_chessboard((x, y))
 
+            # Selecting a piece to move
             if not selected_piece:
                 piece = board[position[0]][position[1]]
                 if piece and ((current_turn == "white" and piece.isupper()) or (current_turn == "black" and piece.islower())):
@@ -486,6 +519,20 @@ while running:
                     # Check if the move is valid for the selected piece
                     valid_moves = get_valid_moves(selected_piece_position, board)
 
+                    # Only allow the king to move if the player is in check or checkmate
+                    if selected_piece.lower() == "k" and ((current_turn == "white" and (white_check or white_checkmate)) or (current_turn == "black" and (black_check or black_checkmate))):
+                        if target_position in valid_moves:
+                            board[selected_piece_position[0]][selected_piece_position[1]] = ""
+                            board[target_position[0]][target_position[1]] = selected_piece
+                            current_turn = "black" if current_turn == "white" else "white"
+                    else:
+                        # Allow normal moves for other pieces
+                        if target_position in valid_moves:
+                            board[selected_piece_position[0]][selected_piece_position[1]] = ""
+                            board[target_position[0]][target_position[1]] = selected_piece
+                        if is_king_in_danger(current_turn, board):
+                            print(f"{current_turn.capitalize()} King is in danger!")
+
                     # Check for castling and regular moves
                     if target_position in valid_moves:
                         # Perform regular move
@@ -497,7 +544,7 @@ while running:
                             pawn_promotion(target_position)
 
                         current_turn = "black" if current_turn == "white" else "white"
-
+                    
                     selected_piece = None
                     selected_piece_position = None
 
@@ -512,10 +559,67 @@ while running:
         # Check for pawn promotion
         if agent_piece.lower() == "p" and agent_move[1][0] in [0, 7]:
             pawn_promotion(agent_move[1])
-
+       
+        if is_king_in_check("black", board):
+            print("AI made an invalid move! Its king is in check.")
+        
         current_turn = "white"  # Switch back to the player's turn
-
+    
     screen.fill(WHITE)
+    # Draw the chessboard
+   
+    for row in range(8):
+        for col in range(8):
+            if (row + col) % 2 == 0:
+                color = WHITE
+            else:
+                color = BROWN
+            pygame.draw.rect(screen, color, (col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE))
+
+    for row in range(8):
+        for col in range(8):
+            piece = board[7 - row][col]
+            if piece:
+                piece_image = images[piece]
+                piece_rect = piece_image.get_rect(center=(col * GRID_SIZE + GRID_SIZE // 2, row * GRID_SIZE + GRID_SIZE // 2))
+                screen.blit(piece_image, piece_rect.topleft)
+
+    if selected_piece_position:
+        x, y = selected_piece_position
+        pygame.draw.rect(screen, GREEN, (y * GRID_SIZE, (7 - x) * GRID_SIZE, GRID_SIZE, GRID_SIZE), 4)
+
+        # Get the valid moves for the selected piece
+        valid_moves = get_valid_moves(selected_piece_position, board)
+
+        # Highlight valid move squares
+        for move in valid_moves:
+            row, col = move
+            pygame.draw.rect(screen, GREEN, (col * GRID_SIZE, (7 - row) * GRID_SIZE, GRID_SIZE, GRID_SIZE), 4)
+
+       
+     
+    white_check = is_king_in_check("white", board)
+    black_check = is_king_in_check("black", board)
+    white_checkmate = is_checkmate("white", board)
+    black_checkmate = is_checkmate("black", board)
+
+    font = pygame.font.Font(None, 36)
+    if white_check:
+        text = font.render("White King is in check!", True, (255, 0, 0))
+        screen.blit(text, (10, 10))
+    elif black_check:
+        text = font.render("Black King is in check!", True, (255, 0, 0))
+        screen.blit(text, (10, 10))
+
+    font = pygame.font.Font(None, 48)
+    if white_checkmate:
+        text = font.render("Checkmate! Black wins!", True, (255, 0, 0))
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
+    elif black_checkmate:
+        text = font.render("Checkmate! White wins!", True, (255, 0, 0))
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
+
+    pygame.display.flip()
 
     # Draw the chessboard
     for row in range(8):
@@ -547,16 +651,6 @@ while running:
         for move in valid_moves:
             row, col = move
             pygame.draw.rect(screen, GREEN, (col * GRID_SIZE, (7 - row) * GRID_SIZE, GRID_SIZE, GRID_SIZE), 4)
-
-    # Check for check and checkmate
-    if is_king_in_check(current_turn, board):
-        check_indicator = "CHECK!"
-        if is_checkmate(current_turn, board):
-            check_indicator = "CHECKMATE!"
-
-        font = pygame.font.Font(None, 36)
-        text = font.render(check_indicator, True, (255, 0, 0))
-        screen.blit(text, (10, 10))
 
     pygame.display.flip()
 
